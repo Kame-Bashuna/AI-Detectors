@@ -1,13 +1,98 @@
 'use client'
 
+import { useState, useRef } from 'react'
+import { detectText, detectImage, detectVideo, getFileType, extractTextFromFile, TextDetectionResult, ImageDetectionResult, VideoDetectionResult } from '@/lib/api'
+import ResultDisplay from './ResultDisplay'
+
 export default function UploadArea() {
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<TextDetectionResult | ImageDetectionResult | VideoDetectionResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [fileName, setFileName] = useState<string>('')
+  const [fileType, setFileType] = useState<'text' | 'image' | 'video' | 'unknown'>('text')
+  const [isDragging, setIsDragging] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleFile = async (file: File) => {
+    setLoading(true)
+    setError(null)
+    setResult(null)
+    setFileName(file.name)
+
+    try {
+      const type = getFileType(file.name)
+      setFileType(type)
+
+      if (type === 'unknown') {
+        throw new Error('Unsupported file type. Please upload a text, image, or video file.')
+      }
+
+      if (type === 'text') {
+        const text = await extractTextFromFile(file)
+        if (!text || text.trim().length === 0) {
+          throw new Error('File appears to be empty or could not be read.')
+        }
+        const detectionResult = await detectText(text)
+        setResult(detectionResult)
+      } else if (type === 'image') {
+        const detectionResult = await detectImage(file)
+        setResult(detectionResult)
+      } else if (type === 'video') {
+        const detectionResult = await detectVideo(file)
+        setResult(detectionResult)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred while processing the file.')
+      console.error('Error processing file:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      handleFile(file)
+    }
+  }
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setIsDragging(false)
+    const file = e.dataTransfer.files[0]
+    if (file) {
+      handleFile(file)
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setIsDragging(false)
+  }
+
   return (
     <div className="mb-10 w-full">
-      <div className="group relative w-full bg-white dark:bg-card-dark rounded-3xl border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-primary dark:hover:border-primary transition-all duration-300 hover:shadow-2xl hover:shadow-primary/5 overflow-hidden">
+      <div
+        className={`group relative w-full bg-white dark:bg-card-dark rounded-3xl border-2 border-dashed transition-all duration-300 hover:shadow-2xl hover:shadow-primary/5 overflow-hidden ${
+          isDragging
+            ? 'border-primary dark:border-primary bg-primary/5'
+            : 'border-gray-300 dark:border-gray-700 hover:border-primary dark:hover:border-primary'
+        }`}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+      >
         <input
+          ref={fileInputRef}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-50"
-          multiple=""
           type="file"
+          onChange={handleFileSelect}
+          accept=".txt,.pdf,.docx,.jpg,.jpeg,.png,.webp,.gif,.mp4,.mov,.avi,.mkv,.webm"
         />
         <div className="flex flex-col items-center justify-center py-20 px-6 text-center relative pointer-events-none">
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
@@ -60,6 +145,14 @@ export default function UploadArea() {
           </div>
         </div>
       </div>
+      
+      <ResultDisplay
+        result={result}
+        fileName={fileName}
+        fileType={fileType}
+        loading={loading}
+        error={error}
+      />
     </div>
   )
 }

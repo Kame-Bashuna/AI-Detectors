@@ -15,7 +15,7 @@ const notoSans = Noto_Sans({
 })
 
 export const metadata: Metadata = {
-  title: 'Unified Upload Interface - AI Content Detector',
+  title: 'AI Disproval System',
   description: 'Upload any media file to verify authenticity. Our engine detects AI patterns across text, images, and video.',
 }
 
