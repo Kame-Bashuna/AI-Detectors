@@ -1,0 +1,6 @@
+backend/
+finetuned_models/
+media/
+training_notebooks/
+db.sqlite3
+
